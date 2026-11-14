@@ -1,5 +1,8 @@
 <img width="772" height="161" alt="image" src="https://github.com/user-attachments/assets/de29f5a5-2115-48cf-b180-76d7bf18671a" />
 
+
+<img width="822" height="666" alt="image" src="https://github.com/user-attachments/assets/0cc813d0-a0a0-48ca-9f43-5a3836f5558d" />
+
 ---------
 
 ## **Lab: Floating Static Routing**
