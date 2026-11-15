@@ -37,8 +37,6 @@ Use `show ip protocols` and `show ip route rip` to verify RIP configuration and 
 
 Ping `2.2.2.2` from R1 and `1.1.1.1` from R2 to verify bidirectional connectivity.
 
-Is this conversation helpful so far?
-
 
 ------
 ## **3. Devices Configuration **
