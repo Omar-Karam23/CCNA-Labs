@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab 8.2 - EIGRP Unequal Cost Load Balancing</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&amp;display=swap');
+
+:root {
+--bg: #0f172a;
+--card: #1e293b;
+--border: #334155;
+--text: #e2e8f0;
+--text-muted: #94a3b8;
+--accent: #38bdf8;
+--accent2: #a78bfa;
+--success: #4ade80;
+--warning: #fbbf24;
+--danger: #f87171;
+--code-bg: #0b1220;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+font-family: 'Cairo', sans-serif;
+background: var(--bg);
+color: var(--text);
+line-height: 1.7;
+padding: 20px;
+max-width: 1100px;
+margin: 0 auto;
+}
+
+h1 {
+font-size: 2.2rem;
+font-weight: 800;
+color: var(--accent);
+margin: 30px 0 15px;
+border-bottom: 3px solid var(--accent);
+padding-bottom: 8px;
+}
+
+h2 {
+font-size: 1.6rem;
+font-weight: 700;
+color: var(--accent2);
+margin: 35px 0 12px;
+}
+
+h3 {
+font-size: 1.25rem;
+font-weight: 600;
+color: #7dd3fc;
+margin: 22px 0 10px;
+}
+
+p, li {
+font-size: 1.05rem;
+color: var(--text-muted);
+margin-bottom: 8px;
+}
+
+ul, ol { padding-right: 25px; margin-bottom: 15px; }
+li { margin-bottom: 6px; }
+
+.card {
+background: var(--card);
+border: 1px solid var(--border);
+border-radius: 12px;
+padding: 20px 24px;
+margin: 18px 0;
+}
+
+.highlight {
+background: linear-gradient(90deg, rgba(56,189,248,0.12), transparent);
+border-right: 4px solid var(--accent);
+padding: 12px 16px;
+margin: 15px 0;
+border-radius: 0 8px 8px 0;
+}
+
+.warning-box {
+background: rgba(251,191,36,0.1);
+border-right: 4px solid var(--warning);
+padding: 12px 16px;
+margin: 15px 0;
+border-radius: 0 8px 8px 0;
+}
+
+.success-box {
+background: rgba(74,222,128,0.1);
+border-right: 4px solid var(--success);
+padding: 12px 16px;
+margin: 15px 0;
+border-radius: 0 8px 8px 0;
+}
+
+pre {
+background: var(--code-bg);
+border: 1px solid var(--border);
+border-radius: 10px;
+padding: 16px;
+overflow-x: auto;
+font-family: 'Courier New', monospace;
+font-size: 0.92rem;
+direction: ltr;
+text-align: left;
+margin: 12px 0;
+line-height: 1.45;
+}
+
+code {
+font-family: 'Courier New', monospace;
+background: #1e293b;
+padding: 2px 6px;
+border-radius: 4px;
+font-size: 0.95rem;
+direction: ltr;
+}
+
+table {
+width: 100%;
+border-collapse: collapse;
+margin: 15px 0;
+font-size: 0.98rem;
+}
+
+th, td {
+border: 1px solid var(--border);
+padding: 10px 12px;
+text-align: right;
+}
+
+th {
+background: #1e3a5f;
+color: var(--accent);
+}
+
+tr:nth-child(even) { background: rgba(30,41,59,0.6); }
+
+.topo {
+background: #0b1220;
+border: 1px dashed var(--accent);
+border-radius: 10px;
+padding: 20px;
+font-family: monospace;
+direction: ltr;
+text-align: center;
+margin: 15px 0;
+line-height: 1.6;
+font-size: 0.95rem;
+}
+
+.star { color: var(--warning); }
+.emoji { margin-left: 6px; }
+
+.footer {
+margin-top: 50px;
+padding-top: 20px;
+border-top: 1px solid var(--border);
+font-size: 0.95rem;
+color: var(--text-muted);
+}
+</style>
+</head>
+<body>
+
+<h1>Lab 8.2 – EIGRP Unequal Cost Load Balancing</h1>
+
+<div class="card">
+<strong>الهدف الأساسي:</strong> فهم وتطبيق خاصية <strong>Unequal Cost Load Balancing</strong> باستخدام أمر <code>variance</code> في EIGRP، وكيف يختار الـ Router أكثر من مسار (حتى لو الـ Metric مختلف) بشرط الـ Feasibility Condition.
+</div>
+
+<!-- ==================== 1. Lab Overview ==================== -->
+<h1>1. Lab Overview</h1>
+
+<h2>الهدف من اللاب <span class="star">⭐</span></h2>
+<p>في EIGRP العادي (Equal Cost) الـ Router بياخد المسارات اللي ليها نفس الـ Metric بالظبط. لكن لو عايز يستخدم مسارات أبطأ كمان (Unequal Cost) علشان يستغل الـ Bandwidth المتاح، بنستخدم أمر <code>variance</code>.</p>
+
+<div class="highlight">
+<strong>المشكلة اللي بيحلها:</strong><br>
+لو عندك مسار سريع ومسار أبطأ شوية، EIGRP بياخد السريع بس ويسيب الأبطأ. الـ <code>variance</code> بيسمحله يستخدم الاتنين مع بعض (Load Balancing) بشرطين مهمين جداً.
+</div>
+
+<h3>الشروط الأساسية لـ Unequal Cost Load Balancing:</h3>
+<ol>
+<li><strong>Feasibility Condition</strong>: الـ Advertised Distance (AD) بتاع المسار الأبطأ لازم يكون أقل من الـ Feasible Distance (FD) بتاع أفضل مسار.</li>
+<li><strong>Variance</strong>: الـ Metric بتاع المسار الأبطأ لازم يكون ≤ (Variance × Best Metric).</li>
+</ol>
+
+<h2>الـ Topology</h2>
+<div class="topo">
+R1 (Serial1/0) ────── 10.0.0.0/30 ────── (Serial1/0) R2<br>
+│                                              │<br>
+│                                              │ Fa0/0<br>
+│                                              │ 12.0.0.0/24<br>
+│                                              │<br>
+(Serial1/1)                                 (Fa0/0)<br>
+11.0.0.0/30                                   R3<br>
+│                                              │<br>
+└──────────────────── Serial1/1 ───────────────┘
+</div>
+
+<p><strong>الـ Destination اللي هنركز عليه:</strong> Loopback على R2 → <code>2.2.2.2/32</code></p>
+
+<p>من R1 هيبقى فيه مسارين لـ 2.2.2.2:</p>
+<ul>
+<li><strong>Path 1 (الأفضل):</strong> R1 → R2 مباشرة عبر Serial 10.0.0.0/30</li>
+<li><strong>Path 2 (الأبطأ):</strong> R1 → R3 → R2 عبر Serial 11.0.0.0/30 ثم Ethernet 12.0.0.0/24</li>
+</ul>
+
+<!-- ==================== 2. Lab Instructions ==================== -->
+<h1>2. Lab Instructions – Steps</h1>
+
+<ol>
+<li><strong>بناء الـ Topology</strong> زي ما هو موضح فوق (3 Routers + روابط Serial + Ethernet بين R2 و R3).</li>
+<li><strong>ضبط الـ IP Addresses</strong> على كل الـ Interfaces حسب الجدول في القسم 3.</li>
+<li><strong>تفعيل EIGRP AS 1</strong> على الـ 3 Routers مع الـ Network Statements الصحيحة.</li>
+<li><strong>ضبط Bandwidth و Delay</strong> (اختياري لكن مفيد عشان تتحكم في الـ Metric وتخلي المسارات Unequal بشكل واضح).</li>
+<li><strong>تفعيل Variance</strong> على R1 فقط: <code>variance 2</code>.</li>
+<li><strong>التحقق</strong> من الـ Topology Table و الـ Routing Table إن الـ Pathين ظاهرين.</li>
+<li><strong>اختبار الـ Load Balancing</strong> بـ traceroute و ping من R1 لـ 2.2.2.2.</li>
+</ol>
+
+<div class="warning-box">
+<strong>ملاحظة مهمة:</strong> الـ Variance بيتطبق على الـ Router اللي عايز يعمل Load Balancing (هنا R1). مش لازم يتكتب على كل الـ Routers.
+</div>
+
+<!-- ==================== 3. Devices Configuration ==================== -->
+<h1>3. Devices Configuration</h1>
+
+<h2>جدول الـ IP Addressing</h2>
+<table>
+<tr>
+<th>Device</th>
+<th>Interface</th>
+<th>IP Address</th>
+<th>Subnet Mask</th>
+</tr>
+<tr>
+<td>R1</td>
+<td>Serial1/0</td>
+<td>10.0.0.1</td>
+<td>255.255.255.252</td>
+</tr>
+<tr>
+<td>R1</td>
+<td>Serial1/1</td>
+<td>11.0.0.1</td>
+<td>255.255.255.252</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>Serial1/0</td>
+<td>10.0.0.2</td>
+<td>255.255.255.252</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>FastEthernet0/0</td>
+<td>12.0.0.2</td>
+<td>255.255.255.0</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>Loopback1</td>
+<td>2.2.2.2</td>
+<td>255.255.255.255</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>Serial1/1</td>
+<td>11.0.0.2</td>
+<td>255.255.255.252</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>FastEthernet0/0</td>
+<td>12.0.0.3</td>
+<td>255.255.255.0</td>
+</tr>
+</table>
+
+<h2>R1 Configuration</h2>
+<pre>
+hostname R1
+!
+interface Serial1/0
+ ip address 10.0.0.1 255.255.255.252
+ no shutdown
+!
+interface Serial1/1
+ ip address 11.0.0.1 255.255.255.252
+ no shutdown
+!
+router eigrp 1
+ variance 2
+ network 10.0.0.0 0.0.0.3
+ network 11.0.0.0 0.0.0.3
+!
+</pre>
+
+<div class="highlight">
+<strong>ملاحظة على الـ Network Statement:</strong><br>
+الأفضل تستخدم Wildcard Mask الصحيح (<code>0.0.0.3</code> للـ /30) بدلاً من <code>network 10.0.0.1 0.0.0.0</code>. الاتنين هيعملوا، لكن الطريقة الأولى أنضف.
+</div>
+
+<h2>R2 Configuration</h2>
+<pre>
+hostname R2
+!
+interface Loopback1
+ ip address 2.2.2.2 255.255.255.255
+!
+interface FastEthernet0/0
+ ip address 12.0.0.2 255.255.255.0
+ no shutdown
+!
+interface Serial1/0
+ ip address 10.0.0.2 255.255.255.252
+ no shutdown
+!
+router eigrp 1
+ network 2.2.2.2 0.0.0.0
+ network 10.0.0.0 0.0.0.3
+ network 12.0.0.0 0.0.0.255
+!
+</pre>
+
+<h2>R3 Configuration</h2>
+<pre>
+hostname R3
+!
+interface FastEthernet0/0
+ ip address 12.0.0.3 255.255.255.0
+ no shutdown
+!
+interface Serial1/1
+ ip address 11.0.0.2 255.255.255.252
+ no shutdown
+!
+router eigrp 1
+ network 11.0.0.0 0.0.0.3
+ network 12.0.0.0 0.0.0.255
+!
+</pre>
+
+<!-- ==================== 4. Checks and Expected Outputs ==================== -->
+<h1>4. Checks and Expected Outputs</h1>
+
+<h2>1. التحقق من الـ Neighbors</h2>
+<pre>
+R1# show ip eigrp neighbors
+</pre>
+<p><strong>المتوقع:</strong> تشوف R2 و R3 كـ Neighbors.</p>
+
+<h2>2. الـ Topology Table (الأهم)</h2>
+<pre>
+R1# show ip eigrp topology
+</pre>
+<p>هنا هتشوف مسارين لـ 2.2.2.2:</p>
+<ul>
+<li>واحد عليه علامة <code>P</code> (Passive) وهو الـ Successor (أفضل مسار عبر R2).</li>
+<li>التاني Feasible Successor (عبر R3) لو الـ Feasibility Condition متحققة.</li>
+</ul>
+
+<pre>
+R1# show ip eigrp topology 2.2.2.2
+</pre>
+<p>الأمر ده هيعرضلك الـ FD و الـ AD بتاع كل مسار بالتفصيل.</p>
+
+<h2>3. الـ Routing Table بعد تفعيل Variance</h2>
+<pre>
+R1# show ip route eigrp
+</pre>
+<p><strong>المتوقع بعد <code>variance 2</code>:</strong></p>
+<pre>
+D     2.2.2.2 [90/xxxx] via 10.0.0.2, Serial1/0
+               [90/yyyy] via 11.0.0.2, Serial1/1
+</pre>
+<p>يعني الـ Route ظاهر مرتين → Load Balancing شغال.</p>
+
+<div class="success-box">
+<strong>لو المسار التاني مش ظاهر في الـ Routing Table:</strong><br>
+• تأكد إن الـ AD بتاع المسار التاني &lt; FD بتاع المسار الأفضل (Feasibility Condition).<br>
+• زوّد قيمة الـ Variance (جرب 3 أو 4).<br>
+• استخدم <code>show ip eigrp topology all-links</code> عشان تشوف كل المسارات حتى لو مش Feasible.
+</div>
+
+<h2>4. أوامر إضافية مفيدة</h2>
+<pre>
+R1# show ip eigrp topology all-links
+R1# show ip protocols
+R1# show interfaces serial1/0
+R1# show interfaces serial1/1
+</pre>
+
+<!-- ==================== 5. End-to-End Connectivity Tests ==================== -->
+<h1>5. End-to-End Connectivity Tests</h1>
+
+<h2>1. اختبار الـ Reachability</h2>
+<pre>
+R1# ping 2.2.2.2
+R1# ping 12.0.0.2
+R1# ping 12.0.0.3
+</pre>
+
+<h2>2. اختبار الـ Load Balancing (الأهم)</h2>
+<pre>
+R1# traceroute 2.2.2.2
+</pre>
+<p>نفّذ الأمر أكتر من مرة. لو الـ Load Balancing شغال، هتلاقي الـ Path بيتغير بين:</p>
+<ul>
+<li>R1 → R2 مباشرة</li>
+<li>R1 → R3 → R2</li>
+</ul>
+
+<div class="highlight">
+<strong>ملاحظة:</strong> EIGRP بيعمل Per-Destination Load Balancing افتراضياً (مش Per-Packet). يعني كل Destination بياخد مسار ثابت، لكن لو عملت traceroute كتير أو استخدمت أدوات تانية هتشوف التوزيع.
+</div>
+
+<h2>3. اختبار إضافي (Advanced)</h2>
+<pre>
+R1# debug ip packet
+! أو
+R1# show ip cef 2.2.2.2 detail
+</pre>
+<p>هتشوف الـ CEF بيوزع الـ Traffic على الـ Paths الموجودة.</p>
+
+<!-- ==================== 6. Troubleshooting ==================== -->
+<h1>6. Troubleshooting</h1>
+
+<table>
+<tr>
+<th>المشكلة</th>
+<th>السبب المحتمل</th>
+<th>الحل</th>
+</tr>
+<tr>
+<td>المسار التاني مش ظاهر في Topology</td>
+<td>Feasibility Condition مش متحققة</td>
+<td>غيّر Bandwidth/Delay عشان الـ AD يبقى أصغر من الـ FD</td>
+</tr>
+<tr>
+<td>المسار ظاهر في Topology بس مش في Routing Table</td>
+<td>قيمة Variance صغيرة</td>
+<td>زوّد <code>variance</code> (جرب 2 أو 3 أو 4)</td>
+</tr>
+<tr>
+<td>مفيش Neighbor بين R1 و R3</td>
+<td>الـ Network Statement ناقص أو Interface Down</td>
+<td>تحقق من <code>show ip eigrp neighbors</code> و <code>show ip interface brief</code></td>
+</tr>
+<tr>
+<td>الـ Metric متساوي (Equal Cost)</td>
+<td>الـ Bandwidth والـ Delay افتراضيين متشابهين</td>
+<td>اضبط Bandwidth مختلف على الـ Serial Interfaces</td>
+</tr>
+<tr>
+<td>Load Balancing مش باين في traceroute</td>
+<td>Per-Destination behavior</td>
+<td>استخدم مصادر مختلفة أو CEF commands</td>
+</tr>
+</table>
+
+<h3>أوامر Debugging مفيدة:</h3>
+<pre>
+debug eigrp packets
+debug eigrp fsm
+show ip eigrp topology all-links
+show ip eigrp traffic
+</pre>
+
+<div class="warning-box">
+<strong>نصيحة ذهبية:</strong><br>
+لو عايز تتحكم في الـ Metric بشكل دقيق، استخدم الأوامر دي على الـ Interfaces:<br>
+<code>bandwidth 64</code> أو <code>delay 1000</code> (القيم بالـ Kbps و Tens of microseconds).<br>
+ده بيخليك تقدر تخلّي مسار أبطأ أو أسرع بسهولة.
+</div>
+
+<!-- ==================== Summary ==================== -->
+<h1>🧠 ملخص سريع</h1>
+<ul>
+<li><strong>Variance</strong> بيسمح بـ Unequal Cost Load Balancing.</li>
+<li>لازم يتحقق شرطين: Feasibility Condition + Variance × Best Metric.</li>
+<li>الـ Variance بيتكتب على الـ Router اللي عايز يعمل Load Balancing (R1 هنا).</li>
+<li>التحقق الأساسي من <code>show ip eigrp topology</code> و <code>show ip route</code>.</li>
+</ul>
+
+<div class="footer">
+<strong>اللاب ده جزء من سلسلة EIGRP</strong> – لو عايز اللاب الجاي (مثلاً EIGRP Stub أو Authentication أو Named Mode) قولي وأجهزهولك بنفس الأسلوب.
+</div>
+
+</body>
+</html>
